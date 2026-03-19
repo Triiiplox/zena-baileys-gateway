@@ -34,7 +34,7 @@ app.use(express.json())
 // ── Config ────────────────────────────────────────────────────────────────────
 const API_KEY     = process.env.API_KEY ?? process.env.WHATSAPP_API_KEY ?? ''
 const PORT        = Number(process.env.PORT ?? 3000)
-const WEBHOOK_URL = process.env.WEBHOOK_URL ?? ''
+let WEBHOOK_URL = process.env.WEBHOOK_URL ?? ''
 const DEFAULT_AUTH_DIR = path.join(__dirname, '.wauth')
 const REQUESTED_AUTH_DIR = process.env.AUTH_DIR ?? DEFAULT_AUTH_DIR
 
@@ -289,9 +289,33 @@ function wipeAuthState(name = 'default') {
 
 // ── API Routes (compatível com waha.ts) ───────────────────────────────────────
 
+// Diagnóstico — GET /api/diagnostic
+app.get('/api/diagnostic', (_req, res) => {
+  const sessionList = []
+  for (const [name, s] of sessions.entries()) {
+    sessionList.push({ name, status: s.status, hasSocket: Boolean(s.sock) })
+  }
+  res.json({
+    version: '1.1.0',
+    engine: 'BAILEYS',
+    webhookUrl: WEBHOOK_URL || '(not configured)',
+    sessions: sessionList,
+    authDir: AUTH_DIR,
+  })
+})
+
+// Configurar webhook em runtime — POST /api/webhook/configure { url }
+app.post('/api/webhook/configure', (req, res) => {
+  const url = String(req.body?.url ?? '').trim()
+  if (!url) return res.status(400).json({ error: 'url is required' })
+  WEBHOOK_URL = url
+  console.log(`[baileys] WEBHOOK_URL atualizado para: ${url}`)
+  res.json({ ok: true, webhookUrl: WEBHOOK_URL })
+})
+
 // Versão
 app.get('/api/version', (_req, res) =>
-  res.json({ version: '1.0.0', engine: 'BAILEYS', tier: 'CORE', browser: 'none' }))
+  res.json({ version: '1.1.0', engine: 'BAILEYS', tier: 'CORE', browser: 'none' }))
 
 // Status da sessão — GET /api/sessions/:session
 app.get('/api/sessions/:session', (req, res) => {
